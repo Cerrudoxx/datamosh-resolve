@@ -130,17 +130,19 @@ Una vez concluido el renderizado, el clip generado se deposita de manera automá
    git clone https://github.com/Cerrudoxx/datamosh-resolve.git
    ```
 2. Haz doble clic en el archivo **`install.bat`**.
-3. El instalador comprobará las dependencias y copiará `Datamosher_Pro.py` y las carpetas de librerías (`DatamoshLib/`, `pymosh/`) en:
-   ```
-   %APPDATA%\Blackmagic Design\DaVinci Resolve\Support\Fusion\Scripts\Edit\
-   ```
+3. El instalador comprobará dependencias, colocará `Datamosher_Pro.py` en Scripts de Fusion y desplegará las librerías (`DatamoshLib/`, `pymosh/`) en Modules de Fusion (evitando que DaVinci ensucie el menú de Scripts con submódulos).
 4. Reinicia DaVinci Resolve si estaba abierto.
 
 ### Opción B: Instalación Manual
-Copia `Datamosher_Pro.py` y las carpetas `DatamoshLib/` y `pymosh/` en:
-```
-%APPDATA%\Blackmagic Design\DaVinci Resolve\Support\Fusion\Scripts\Edit\
-```
+1. Copia `Datamosher_Pro.py` en:
+   ```
+   %APPDATA%\Blackmagic Design\DaVinci Resolve\Support\Fusion\Scripts\Edit\
+   ```
+2. Copia las carpetas `DatamoshLib/` y `pymosh/` en:
+   ```
+   %APPDATA%\Blackmagic Design\DaVinci Resolve\Support\Fusion\Modules\
+   ```
+   *(Colocar las librerías en `Modules` permite que se carguen automáticamente sin aparecer como scripts en el menú de DaVinci).*
 
 ---
 

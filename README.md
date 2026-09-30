@@ -130,17 +130,19 @@ Once rendering completes, the transition clip is automatically deposited into yo
    git clone https://github.com/Cerrudoxx/datamosh-resolve.git
    ```
 2. Double-click **`install.bat`**.
-3. The script verifies dependencies and copies `Datamosher_Pro.py` and its libraries (`DatamoshLib/`, `pymosh/`) into:
-   ```
-   %APPDATA%\Blackmagic Design\DaVinci Resolve\Support\Fusion\Scripts\Edit\
-   ```
+3. The installer verifies dependencies, places `Datamosher_Pro.py` into Fusion Scripts, and deploys the libraries (`DatamoshLib/`, `pymosh/`) into Fusion Modules (keeping your Workspace Scripts menu clean).
 4. Restart DaVinci Resolve if it was open.
 
 ### Method 2: Manual Installation
-Copy `Datamosher_Pro.py` and the directories `DatamoshLib/` and `pymosh/` into:
-```
-%APPDATA%\Blackmagic Design\DaVinci Resolve\Support\Fusion\Scripts\Edit\
-```
+1. Copy `Datamosher_Pro.py` into:
+   ```
+   %APPDATA%\Blackmagic Design\DaVinci Resolve\Support\Fusion\Scripts\Edit\
+   ```
+2. Copy the directories `DatamoshLib/` and `pymosh/` into:
+   ```
+   %APPDATA%\Blackmagic Design\DaVinci Resolve\Support\Fusion\Modules\
+   ```
+   *(Placing libraries in `Modules` ensures they load automatically while preventing DaVinci Resolve from cluttering your Scripts menu).*
 
 ---
 

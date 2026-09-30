@@ -35,10 +35,48 @@ import webbrowser
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 
-# Add script directory to sys.path for local module resolution
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-if SCRIPT_DIR not in sys.path:
+def get_script_dir():
+    """
+    Safely resolves the directory where the script is located.
+    Handles DaVinci Resolve's embedded script runner where '__file__' is not defined in globals.
+    """
+    if "__file__" in globals() and globals()["__file__"]:
+        try:
+            return os.path.dirname(os.path.abspath(globals()["__file__"]))
+        except Exception:
+            pass
+    if sys.argv and sys.argv[0] and os.path.isfile(sys.argv[0]):
+        try:
+            return os.path.dirname(os.path.abspath(sys.argv[0]))
+        except Exception:
+            pass
+    try:
+        import DaVinciResolveScript as dvr
+        app = dvr.scriptapp("Resolve")
+        if app and app.Fusion():
+            mapped = app.Fusion().MapPath("Scripts:Edit")
+            if mapped and os.path.isdir(mapped):
+                return mapped
+    except Exception:
+        pass
+    appdata = os.getenv("APPDATA")
+    if appdata:
+        std_edit = os.path.join(appdata, "Blackmagic Design", "DaVinci Resolve", "Support", "Fusion", "Scripts", "Edit")
+        if os.path.isdir(std_edit):
+            return std_edit
+    return os.getcwd()
+
+# Configure module search paths
+SCRIPT_DIR = get_script_dir()
+if SCRIPT_DIR and SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
+
+# Also ensure DaVinci Fusion Modules directory is in sys.path
+appdata = os.getenv("APPDATA")
+if appdata:
+    fusion_modules = os.path.join(appdata, "Blackmagic Design", "DaVinci Resolve", "Support", "Fusion", "Modules")
+    if os.path.isdir(fusion_modules) and fusion_modules not in sys.path:
+        sys.path.insert(0, fusion_modules)
 
 # Import datamoshing engines
 try:
@@ -49,6 +87,7 @@ try:
 except Exception as e:
     MOTORS_OK = False
     MOTOR_ERR = str(e)
+
 
 
 def get_resolve():
