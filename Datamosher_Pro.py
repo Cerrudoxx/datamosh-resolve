@@ -6,15 +6,16 @@ Datamosher Pro — DaVinci Resolve Integration
 A native DaVinci Resolve integration for authentic video datamoshing.
 
 Features:
-1. Intelligent Clip Detection:
-   - Automatically detects 2 contiguous clips at the timeline playhead cut point.
-   - Detects clips selected in the Media Pool.
-   - Provides an interactive dropdown of all timeline video clips.
-2. 2-Clip Datamosh Transitions:
-   - Performs binary I-frame stripping at the exact transition cut point.
-   - Glitches motion vectors across clips using MPEG-4 / AVI bitstream corruption.
-3. Single Clip Datamosh:
-   - Applies motion trails, velocity explosions, and frame repetitions by time range.
+1. Intelligent Timeline Trim Detection:
+   - Automatically detects the exact In-point and Duration of trimmed clips on the timeline.
+   - Detects contiguous clips at the cut boundary under the playhead.
+   - Supports Media Pool selections and custom timeline clip pairings.
+2. 2-Clip Datamosh Cut Transitions:
+   - Slices precisely at the timeline cut point without processing entire raw source files.
+   - Performs binary I-frame stripping at the cut boundary.
+   - Applies motion vector tearing across clips using MPEG-4 / AVI bitstream corruption.
+3. Single Clip Datamoshing:
+   - Respects timeline in/out ranges for targeted motion glitching.
 4. Automatic Media Pool Import:
    - Seamlessly imports rendered glitched media directly back into DaVinci Resolve.
 
@@ -34,6 +35,7 @@ import subprocess
 import webbrowser
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
+
 
 def get_script_dir():
     """
@@ -66,12 +68,13 @@ def get_script_dir():
             return std_edit
     return os.getcwd()
 
+
 # Configure module search paths
 SCRIPT_DIR = get_script_dir()
 if SCRIPT_DIR and SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
 
-# Also ensure DaVinci Fusion Modules directory is in sys.path
+# Ensure DaVinci Fusion Modules directory is in sys.path
 appdata = os.getenv("APPDATA")
 if appdata:
     fusion_modules = os.path.join(appdata, "Blackmagic Design", "DaVinci Resolve", "Support", "Fusion", "Modules")
@@ -87,7 +90,6 @@ try:
 except Exception as e:
     MOTORS_OK = False
     MOTOR_ERR = str(e)
-
 
 
 def get_resolve():
@@ -141,8 +143,8 @@ class DatamosherResolveApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Datamosher Pro — DaVinci Resolve")
-        self.root.geometry("680x720")
-        self.root.minsize(620, 660)
+        self.root.geometry("700x760")
+        self.root.minsize(640, 700)
         self.root.configure(bg="#181818")
 
         # Configure dark theme styles
@@ -151,6 +153,8 @@ class DatamosherResolveApp:
         self.style.configure(".", background="#181818", foreground="#ffffff", font=("Segoe UI", 10))
         self.style.configure("TLabel", background="#181818", foreground="#ffffff")
         self.style.configure("Header.TLabel", font=("Segoe UI", 13, "bold"), foreground="#00b4d8")
+        self.style.configure("Info.TLabel", font=("Segoe UI", 9), foreground="#00b4d8")
+        self.style.configure("TCheckbutton", background="#181818", foreground="#ffffff", font=("Segoe UI", 9, "bold"))
         self.style.configure("TNotebook", background="#181818", borderwidth=0)
         self.style.configure("TNotebook.Tab", background="#282828", foreground="#ffffff", padding=[14, 7], font=("Segoe UI", 10, "bold"))
         self.style.map("TNotebook.Tab", background=[("selected", "#0077b6")], foreground=[("selected", "#ffffff")])
@@ -164,6 +168,11 @@ class DatamosherResolveApp:
         # State variables for 2-clip transition
         self.trans_clip1 = tk.StringVar(value="")
         self.trans_clip2 = tk.StringVar(value="")
+        self.trans_c1_in = tk.DoubleVar(value=0.0)
+        self.trans_c1_dur = tk.DoubleVar(value=0.0)
+        self.trans_c2_in = tk.DoubleVar(value=0.0)
+        self.trans_c2_dur = tk.DoubleVar(value=0.0)
+        self.use_timeline_trim = tk.BooleanVar(value=True)
         self.trans_duration = tk.DoubleVar(value=2.0)
         self.trans_delta = tk.IntVar(value=8)
         self.trans_mode = tk.StringVar(value="Classic (I-Frame Drop at Cut)")
@@ -254,7 +263,10 @@ class DatamosherResolveApp:
         r1 = ttk.Frame(f1)
         r1.pack(fill="x")
         ttk.Entry(r1, textvariable=self.trans_clip1, state="readonly").pack(side="left", fill="x", expand=True, padx=(0, 5))
-        ttk.Button(r1, text="Browse...", command=lambda: self.browse(self.trans_clip1)).pack(side="right")
+        ttk.Button(r1, text="Browse...", command=lambda: self.browse(self.trans_clip1, self.trans_c1_in, self.trans_c1_dur)).pack(side="right")
+
+        self.lbl_c1_trim = ttk.Label(f1, text="✂️ Timeline Trim: In: 0.00s | Duration: Full File", style="Info.TLabel")
+        self.lbl_c1_trim.pack(anchor="w", pady=(3, 0))
 
         # Incoming Clip (B)
         f2 = ttk.LabelFrame(self.tab_trans, text=" 2. Incoming Clip (Motion tearing into Clip A) ", padding=8)
@@ -267,11 +279,21 @@ class DatamosherResolveApp:
         r2 = ttk.Frame(f2)
         r2.pack(fill="x")
         ttk.Entry(r2, textvariable=self.trans_clip2, state="readonly").pack(side="left", fill="x", expand=True, padx=(0, 5))
-        ttk.Button(r2, text="Browse...", command=lambda: self.browse(self.trans_clip2)).pack(side="right")
+        ttk.Button(r2, text="Browse...", command=lambda: self.browse(self.trans_clip2, self.trans_c2_in, self.trans_c2_dur)).pack(side="right")
+
+        self.lbl_c2_trim = ttk.Label(f2, text="✂️ Timeline Trim: In: 0.00s | Duration: Full File", style="Info.TLabel")
+        self.lbl_c2_trim.pack(anchor="w", pady=(3, 0))
 
         # Transition Settings
         p_frame = ttk.LabelFrame(self.tab_trans, text=" Cut Glitch Settings ", padding=10)
         p_frame.pack(fill="x", pady=8)
+
+        # Timeline Trim Checkbox
+        row_trim = ttk.Frame(p_frame)
+        row_trim.pack(fill="x", pady=(0, 6))
+        chk_trim = ttk.Checkbutton(row_trim, text="Use Timeline In/Out Trim (Cut Boundaries)",
+                                   variable=self.use_timeline_trim, style="TCheckbutton")
+        chk_trim.pack(side="left")
 
         # Effect duration
         row1 = ttk.Frame(p_frame)
@@ -312,7 +334,7 @@ class DatamosherResolveApp:
         f1 = ttk.LabelFrame(self.tab_single, text=" Target Video Clip ", padding=8)
         f1.pack(fill="x", pady=4)
         ttk.Entry(f1, textvariable=self.single_clip, state="readonly").pack(side="left", fill="x", expand=True, padx=(0, 5))
-        ttk.Button(f1, text="Browse...", command=lambda: self.browse(self.single_clip)).pack(side="right")
+        ttk.Button(f1, text="Browse...", command=lambda: self.browse_single(self.single_clip)).pack(side="right")
 
         btn_detect = ttk.Button(self.tab_single, text="⚡ Detect Selected Clip in DaVinci",
                                 style="Detect.TButton", command=self.detect_single_clip)
@@ -330,7 +352,7 @@ class DatamosherResolveApp:
         ttk.Combobox(m_frame, textvariable=self.single_mode, values=modes, state="readonly").pack(fill="x", pady=2)
 
         # Time Range
-        r_frame = ttk.LabelFrame(self.tab_single, text=" Effect Time Range ", padding=8)
+        r_frame = ttk.LabelFrame(self.tab_single, text=" Effect Time Range (Seconds in Source) ", padding=8)
         r_frame.pack(fill="x", pady=6)
         rw1 = ttk.Frame(r_frame)
         rw1.pack(fill="x", pady=3)
@@ -349,46 +371,132 @@ class DatamosherResolveApp:
                                      command=self.run_single)
         btn_single_mosh.pack(fill="x", pady=15, ipady=6)
 
-    def browse(self, var):
+    def browse(self, var, in_var, dur_var):
         f = filedialog.askopenfilename(filetypes=[("Video files", "*.mp4 *.mov *.avi *.mkv"), ("All files", "*.*")])
         if f:
             var.set(f)
+            in_var.set(0.0)
+            dur_var.set(round(get_video_duration(f), 3))
+            self.update_trim_labels()
+
+    def browse_single(self, var):
+        f = filedialog.askopenfilename(filetypes=[("Video files", "*.mp4 *.mov *.avi *.mkv"), ("All files", "*.*")])
+        if f:
+            var.set(f)
+            dur = get_video_duration(f)
+            self.single_start.set(0.0)
+            self.single_end.set(round(min(dur, 2.5), 2))
+
+    def update_trim_labels(self):
+        in1 = self.trans_c1_in.get()
+        dur1 = self.trans_c1_dur.get()
+        in2 = self.trans_c2_in.get()
+        dur2 = self.trans_c2_dur.get()
+        self.lbl_c1_trim.config(text=f"✂️ Timeline Trim: In: {in1:.2f}s | Duration: {dur1:.2f}s (Cut at: {in1 + dur1:.2f}s)")
+        self.lbl_c2_trim.config(text=f"✂️ Timeline Trim: In: {in2:.2f}s | Duration: {dur2:.2f}s (Starts at: {in2:.2f}s)")
 
     def on_clip1_dropdown_select(self, event=None):
         idx = self.cmb_clip1.current()
         if 0 <= idx < len(self.timeline_clips_cache):
-            self.trans_clip1.set(self.timeline_clips_cache[idx]["file_path"])
+            c = self.timeline_clips_cache[idx]
+            self.trans_clip1.set(c["file_path"])
+            self.trans_c1_in.set(c["in_sec"])
+            self.trans_c1_dur.set(c["dur_sec"])
+            self.update_trim_labels()
 
     def on_clip2_dropdown_select(self, event=None):
         idx = self.cmb_clip2.current()
         if 0 <= idx < len(self.timeline_clips_cache):
-            self.trans_clip2.set(self.timeline_clips_cache[idx]["file_path"])
+            c = self.timeline_clips_cache[idx]
+            self.trans_clip2.set(c["file_path"])
+            self.trans_c2_in.set(c["in_sec"])
+            self.trans_c2_dur.set(c["dur_sec"])
+            self.update_trim_labels()
 
     # -------------------------------------------------------------
     # DAVINCI RESOLVE TIMELINE CLIP DETECTION
     # -------------------------------------------------------------
     def get_all_timeline_clips(self, timeline):
         """
-        Scans all video tracks on the timeline and returns sorted clips.
+        Scans all video tracks on the timeline and returns sorted clips with accurate trim info.
         """
         clips = []
         try:
             track_count = timeline.GetTrackCount("video")
+            timeline_fps = 24.0
+            try:
+                tl_fps = timeline.GetSetting("timelineFrameRate")
+                if tl_fps:
+                    timeline_fps = float(tl_fps)
+            except Exception:
+                pass
+            if timeline_fps <= 0:
+                timeline_fps = 24.0
+
             for t in range(1, track_count + 1):
                 items = timeline.GetItemListInTrack("video", t) or []
                 for it in items:
                     fp = get_item_file_path(it)
                     if fp:
                         name = it.GetName() or os.path.basename(fp)
-                        start = it.GetStart()
-                        end = it.GetEnd()
+                        start_frame = it.GetStart()
+                        end_frame = it.GetEnd()
+                        dur_frames = it.GetDuration()
+
+                        # Determine source framerate
+                        source_fps = timeline_fps
+                        mp = it.GetMediaPoolItem() if hasattr(it, "GetMediaPoolItem") else None
+                        if mp:
+                            try:
+                                s_fps = float(mp.GetClipProperty("FPS") or timeline_fps)
+                                if s_fps > 0:
+                                    source_fps = s_fps
+                            except Exception:
+                                pass
+
+                        # Determine in-point in seconds
+                        in_sec = 0.0
+                        left_offset = None
+                        try:
+                            left_offset = it.GetLeftOffset()
+                        except Exception:
+                            pass
+
+                        try:
+                            if hasattr(it, "GetSourceStartTime"):
+                                st = it.GetSourceStartTime()
+                                if isinstance(st, (int, float)) and st > 0:
+                                    in_sec = float(st)
+                        except Exception:
+                            pass
+
+                        if in_sec == 0.0 and isinstance(left_offset, (int, float)) and left_offset > 0:
+                            in_sec = float(left_offset) / source_fps
+
+                        dur_sec = float(dur_frames) / timeline_fps if dur_frames else 0.0
+
+                        # Sanity check against video file on disk
+                        total_file_dur = get_video_duration(fp)
+                        if total_file_dur > 0:
+                            if in_sec >= total_file_dur:
+                                # Fallback if broadcast timecode was returned
+                                if isinstance(left_offset, (int, float)) and 0 <= (float(left_offset) / source_fps) < total_file_dur:
+                                    in_sec = float(left_offset) / source_fps
+                                else:
+                                    in_sec = 0.0
+                            if dur_sec <= 0 or (in_sec + dur_sec) > (total_file_dur + 1.0):
+                                dur_sec = max(0.5, total_file_dur - in_sec)
+
                         clips.append({
                             "item": it,
                             "name": name,
                             "file_path": fp,
-                            "start": start,
-                            "end": end,
-                            "track": t
+                            "start": start_frame,
+                            "end": end_frame,
+                            "track": t,
+                            "in_sec": round(in_sec, 3),
+                            "dur_sec": round(dur_sec, 3),
+                            "fps": source_fps
                         })
             # Sort by timeline start position, then by track number
             clips.sort(key=lambda c: (c["start"], c["track"]))
@@ -398,14 +506,17 @@ class DatamosherResolveApp:
 
     def update_dropdowns(self, clips):
         self.timeline_clips_cache = clips
-        options = [f"{i+1}. {c['name']} (V{c['track']}, start: {c['start']})" for i, c in enumerate(clips)]
+        options = [
+            f"{i+1}. {c['name']} (V{c['track']}, in: {c['in_sec']}s, dur: {c['dur_sec']}s)"
+            for i, c in enumerate(clips)
+        ]
         self.cmb_clip1["values"] = options
         self.cmb_clip2["values"] = options
 
     def detect_from_timeline_playhead(self):
         """
         Detects 2 contiguous clips at the cut point under the playhead.
-        Falls back to adjacent timeline clips or first clip if single.
+        Accurately extracts timeline trim in-points and durations.
         """
         resolve = get_resolve()
         if not resolve:
@@ -454,14 +565,28 @@ class DatamosherResolveApp:
                     c1 = clips[0]
                     c2 = clips[1]
                 elif len(clips) == 1:
-                    self.single_clip.set(clips[0]["file_path"])
-                    self.trans_clip1.set(clips[0]["file_path"])
-                    self.status_var.set(f"Detected 1 clip: {clips[0]['name']}. Please select the second clip.")
+                    c = clips[0]
+                    self.single_clip.set(c["file_path"])
+                    self.single_start.set(c["in_sec"])
+                    self.single_end.set(round(c["in_sec"] + c["dur_sec"], 2))
+                    self.trans_clip1.set(c["file_path"])
+                    self.trans_c1_in.set(c["in_sec"])
+                    self.trans_c1_dur.set(c["dur_sec"])
+                    self.update_trim_labels()
+                    self.status_var.set(f"Detected 1 clip: {c['name']}. Please select the second clip.")
                     return
 
             if c1 and c2:
                 self.trans_clip1.set(c1["file_path"])
+                self.trans_c1_in.set(c1["in_sec"])
+                self.trans_c1_dur.set(c1["dur_sec"])
+
                 self.trans_clip2.set(c2["file_path"])
+                self.trans_c2_in.set(c2["in_sec"])
+                self.trans_c2_dur.set(c2["dur_sec"])
+
+                self.update_trim_labels()
+
                 try:
                     self.cmb_clip1.current(clips.index(c1))
                     self.cmb_clip2.current(clips.index(c2))
@@ -499,10 +624,20 @@ class DatamosherResolveApp:
 
             if len(files) >= 2:
                 self.trans_clip1.set(files[0])
+                self.trans_c1_in.set(0.0)
+                self.trans_c1_dur.set(round(get_video_duration(files[0]), 3))
+
                 self.trans_clip2.set(files[1])
+                self.trans_c2_in.set(0.0)
+                self.trans_c2_dur.set(round(get_video_duration(files[1]), 3))
+
+                self.update_trim_labels()
                 self.status_var.set(f"✅ 2 clips loaded from Media Pool: {os.path.basename(files[0])} ➜ {os.path.basename(files[1])}")
             elif len(files) == 1:
                 self.trans_clip1.set(files[0])
+                self.trans_c1_in.set(0.0)
+                self.trans_c1_dur.set(round(get_video_duration(files[0]), 3))
+                self.update_trim_labels()
                 self.status_var.set(f"1 clip selected in Media Pool: {os.path.basename(files[0])}. Please select the second clip.")
             else:
                 messagebox.showinfo(
@@ -514,7 +649,8 @@ class DatamosherResolveApp:
 
     def detect_single_clip(self):
         """
-        Detects the clip under the playhead for single-clip datamoshing.
+        Detects the clip under the playhead for single-clip datamoshing,
+        pre-populating its trimmed timeline start and end times.
         """
         resolve = get_resolve()
         if not resolve:
@@ -528,10 +664,28 @@ class DatamosherResolveApp:
             if not tl:
                 return
             it = tl.GetCurrentVideoItem()
-            fp = get_item_file_path(it) if it else None
-            if fp:
-                self.single_clip.set(fp)
-                self.status_var.set(f"Detected clip: {os.path.basename(fp)}")
+            if not it:
+                return
+            fp = get_item_file_path(it)
+            if not fp:
+                return
+            self.single_clip.set(fp)
+
+            # Match against timeline clips cache for exact trim
+            found = False
+            for c in self.timeline_clips_cache:
+                if c["file_path"] == fp:
+                    self.single_start.set(c["in_sec"])
+                    self.single_end.set(round(c["in_sec"] + c["dur_sec"], 2))
+                    found = True
+                    break
+
+            if not found:
+                dur = get_video_duration(fp)
+                self.single_start.set(0.0)
+                self.single_end.set(round(min(dur, 2.5), 2))
+
+            self.status_var.set(f"Detected clip: {os.path.basename(fp)} ({self.single_start.get()}s to {self.single_end.get()}s)")
         except Exception:
             pass
 
@@ -563,23 +717,66 @@ class DatamosherResolveApp:
             name2 = os.path.splitext(os.path.basename(c2))[0]
             out_trans = os.path.join(base_dir, f"Transition_{name1}_to_{name2}_datamoshed.mp4")
 
-            self.status_var.set("Step 1/4: Analyzing clip durations...")
-            d1 = get_video_duration(c1)
-            if d1 <= 0.0:
-                d1 = 3.0
+            self.status_var.set("Step 1/4: Analyzing timeline trim boundaries...")
+
+            # Retrieve trim values
+            in1 = self.trans_c1_in.get()
+            dur1 = self.trans_c1_dur.get()
+            in2 = self.trans_c2_in.get()
+            dur2 = self.trans_c2_dur.get()
+            use_trims = self.use_timeline_trim.get()
 
             mosh_len = self.trans_duration.get()
-            mosh_start = max(0.0, d1 - 0.05)  # Exact cut point
-            mosh_end = d1 + mosh_len
             delta = self.trans_delta.get()
             mode = self.trans_mode.get()
 
-            # Step 2: Concatenate both clips into a clean MPEG-4 AVI container without B-frames
-            self.status_var.set("Step 2/4: Joining clips into MPEG-4 intermediate container...")
+            # Total file durations on disk
+            tot_d1 = get_video_duration(c1)
+            tot_d2 = get_video_duration(c2)
+
+            if dur1 <= 0.0 or not use_trims:
+                in1 = 0.0
+                dur1 = tot_d1 if tot_d1 > 0 else 3.0
+
+            if dur2 <= 0.0 or not use_trims:
+                in2 = 0.0
+                dur2 = tot_d2 if tot_d2 > 0 else 3.0
+
+            # Calculate cut point in Clip 1: cut is at (in1 + dur1)
+            cut_point_1 = in1 + dur1
+            if tot_d1 > 0:
+                cut_point_1 = min(cut_point_1, tot_d1)
+
+            # Lead-in duration of Clip 1 preceding the cut
+            lead_in = min(dur1, 4.0)
+            c1_seek = max(in1, cut_point_1 - lead_in)
+            c1_extract_dur = max(0.3, cut_point_1 - c1_seek)
+
+            # Clip 2 starts directly at in2
+            c2_seek = in2
+            if tot_d2 > 0:
+                c2_seek = min(c2_seek, max(0.0, tot_d2 - 0.2))
+
+            # Clip 2 duration: cover the mosh length plus clean tail
+            c2_extract_dur = max(mosh_len + 1.2, 2.0)
+            if dur2 > 0:
+                c2_extract_dur = min(dur2, c2_extract_dur)
+            if tot_d2 > 0 and (c2_seek + c2_extract_dur) > tot_d2:
+                c2_extract_dur = max(0.3, tot_d2 - c2_seek)
+
+            # Cut point in the joined intermediate container
+            d1 = c1_extract_dur
+            mosh_start = max(0.0, d1 - 0.05)  # Exact cut boundary
+            mosh_end = d1 + mosh_len
+
+            # Step 2: Extract trimmed segments and concatenate into intermediate MPEG-4 AVI container
+            self.status_var.set(f"Step 2/4: Slicing trims ({c1_extract_dur:.2f}s + {c2_extract_dur:.2f}s) into MPEG-4 container...")
             temp_avi = os.path.join(base_dir, f"__tmp_joined_{name1}_{name2}.avi")
 
             cmd_join = (
-                f'ffmpeg -y -i "{c1}" -i "{c2}" '
+                f'ffmpeg -y '
+                f'-ss {c1_seek:.3f} -t {c1_extract_dur:.3f} -i "{c1}" '
+                f'-ss {c2_seek:.3f} -t {c2_extract_dur:.3f} -i "{c2}" '
                 f'-filter_complex "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v0]; '
                 f'[1:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v1]; '
                 f'[v0][v1]concat=n=2:v=1:a=0[v]" -map "[v]" -bf 0 -g 1000 -b:v 14000k -vcodec mpeg4 -an "{temp_avi}"'
@@ -673,29 +870,29 @@ class DatamosherResolveApp:
             name = os.path.splitext(os.path.basename(in_path))[0]
             out_file = os.path.join(base_dir, f"{name}_datamoshed.mp4")
 
-            self.status_var.set("Step 1/3: Preparing intermediate MPEG-4 AVI container...")
+            s = self.single_start.get()
+            e = self.single_end.get()
+            p = self.single_delta.get()
+            m = self.single_mode.get()
+
+            dur_trim = max(0.3, e - s)
+
+            self.status_var.set(f"Step 1/3: Slicing trim ({s:.2f}s to {e:.2f}s) into MPEG-4 container...")
             temp_avi = os.path.join(base_dir, f"__tmp_{name}.avi")
-            cmd_convert = f'ffmpeg -y -i "{in_path}" -bf 0 -g 1000 -b:v 12000k -vcodec mpeg4 -an "{temp_avi}"'
+            cmd_convert = f'ffmpeg -y -ss {s:.3f} -t {dur_trim:.3f} -i "{in_path}" -bf 0 -g 1000 -b:v 12000k -vcodec mpeg4 -an "{temp_avi}"'
             subprocess.call(cmd_convert, shell=True)
 
             self.status_var.set("Step 2/3: Corrupting I-frames and repeating P-frames...")
             temp_corrupt = os.path.join(base_dir, f"__corrupt_{name}.avi")
 
-            m = self.single_mode.get()
-            s = self.single_start.get()
-            e = self.single_end.get()
-            p = self.single_delta.get()
-
             if "Bloom" in m:
-                tomato.mosh(infile=temp_avi, outfile=temp_corrupt, m="bloom", c=p, n=int(s * 30),
-                            k=0.7, a=0, f=1)
+                tomato.mosh(infile=temp_avi, outfile=temp_corrupt, m="bloom", c=p, n=0, k=0.7, a=0, f=1)
             elif "Repeat" in m:
-                repeat.Datamosh(temp_avi, temp_corrupt, s=int(s * 30), e=int(e * 30), p=p, fps=30)
+                repeat.Datamosh(temp_avi, temp_corrupt, s=0, e=int(dur_trim * 30), p=p, fps=30)
             elif "Void" in m:
-                tomato.mosh(infile=temp_avi, outfile=temp_corrupt, m="void", c=p, n=int(s * 30),
-                            k=0.7, a=0, f=1)
+                tomato.mosh(infile=temp_avi, outfile=temp_corrupt, m="void", c=p, n=0, k=0.7, a=0, f=1)
             else:
-                classic.Datamosh(temp_avi, temp_corrupt, s=s, e=e, p=p, fps=30)
+                classic.Datamosh(temp_avi, temp_corrupt, s=0.0, e=dur_trim, p=p, fps=30)
 
             self.status_var.set("Step 3/3: Re-encoding with libavcodec to bake glitch...")
             cmd_fix = f'ffmpeg -y -i "{temp_corrupt}" -c:v libx264 -preset fast -crf 18 -pix_fmt yuv420p "{out_file}"'
