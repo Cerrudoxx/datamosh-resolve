@@ -127,7 +127,7 @@ Once rendering completes, the transition clip is automatically deposited into yo
 ### Method 1: 1-Click Automated Installer (Recommended)
 1. Clone or download this repository:
    ```cmd
-   git clone https://github.com/YOUR_USERNAME/Datamosh-Resolve.git
+   git clone https://github.com/Cerrudoxx/datamosh-resolve.git
    ```
 2. Double-click **`install.bat`**.
 3. The script verifies dependencies and copies `Datamosher_Pro.py` and its libraries (`DatamoshLib/`, `pymosh/`) into:

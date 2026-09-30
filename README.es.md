@@ -127,7 +127,7 @@ Una vez concluido el renderizado, el clip generado se deposita de manera automá
 ### Opción A: Instalador Automático en 1 Clic (Recomendado)
 1. Clona o descarga este repositorio en tu equipo:
    ```cmd
-   git clone https://github.com/TU_USUARIO/Datamosh-Resolve.git
+   git clone https://github.com/Cerrudoxx/datamosh-resolve.git
    ```
 2. Haz doble clic en el archivo **`install.bat`**.
 3. El instalador comprobará las dependencias y copiará `Datamosher_Pro.py` y las carpetas de librerías (`DatamoshLib/`, `pymosh/`) en:
