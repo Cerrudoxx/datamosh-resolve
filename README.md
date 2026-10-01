@@ -61,51 +61,33 @@ flowchart LR
 
 ---
 
-## ✨ Features
+## ✨ Features (v2.0)
 
-- 🔀 **Automated 2-Clip Cut Transitions:** Concatenates outgoing and incoming clips, surgically drops the keyframe at the exact cut point, and renders the baked transition.
-- 📍 **Smart Timeline Playhead Detection:** Queries DaVinci Resolve's active timeline to automatically detect the two clips surrounding the playhead across any video track.
-- 📋 **Timeline Video Clip Index:** Dropdown selector listing every video clip on the active timeline for custom pairings.
-- 📁 **Media Pool Multi-Selection:** Select any two clips in the DaVinci Media Pool (`Ctrl + Click`) and load them with one click.
-- 🎬 **Single Clip Datamoshing:** Apply motion trails, velocity bloom, and frame loops across user-defined time ranges on individual video clips.
-- 📥 **Automated Media Pool Re-Import:** Automatically imports the finished MP4 file directly into the active project Media Pool.
-- 🆓 **Full Compatibility:** 100% functional on **DaVinci Resolve Free** and **DaVinci Resolve Studio** (v20+ on Windows 64-bit).
-
----
-
-## 📸 Interface & Workflow
-
-<div align="center">
-
-### 1. Launching from DaVinci Resolve Menu
-Launch the tool from the top menu bar under **Workspace -> Scripts -> Datamosher_Pro**:
-
-<img src="docs/images/resolve_menu.png" alt="DaVinci Resolve Workspace Menu" width="85%" />
-
----
-
-### 2. Transition Script Interface
-Detect clips at the cut point or select from the Media Pool / dropdowns, adjust duration and delta, and trigger the transition:
-
-<img src="docs/images/gui_transition.png" alt="Datamosher Pro Script Interface" width="85%" />
-
----
-
-### 3. Transition Result
-Once rendering completes, the transition clip is automatically deposited into your active **Media Pool**. It contains the baked, genuine datamosh glitch where the incoming scene's motion vectors displace and tear the macroblocks of the frozen outgoing frame. Drag and drop it directly onto your timeline over the cut!
-
-</div>
+- 🔀 **GOP-Aligned Bitstream Datamosh Engine:** Encodes outgoing and incoming clips separately into intermediate streams and joins them losslessly. Guarantees a targeted I-frame at the cut boundary and a precision recovery keyframe at the exact end of the glitch duration.
+- ⏱️ **Independent Pre-Cut & Post-Cut Trims:** Fine-tune lead-in and tail durations independently with a live visual composition bar (`[Clip 1: Xs] ➔ ⚡ [GLITCH: Xs] ➔ [Clip 2: Xs]`).
+- ⚡ **1-Click Style Presets:** Instant configuration with *Fluid Melt*, *Kinetic Stutter*, *Vector Bloom*, *Macro Glide*, and *Fast Whip*.
+- 🎯 **Automated Timeline Placement:** Automatically creates or uses an upper video track (V2/V3) and drops the rendered transition centered over the cut point on the timeline.
+- 🎛️ **7 Datamosher Pro Glitch Algorithms:** Full suite of bitstream manipulation modes with real-time in-UI descriptive guidance and usage tips.
+- 🖼️ **Cut-Frame Thumbnail Previews:** Background extraction of the exact outgoing cut frame and incoming start frame for visual confirmation.
+- 🎵 **Audio Crossfade Integration:** Optional smooth audio crossfading across the transition boundary.
+- 📍 **Smart Timeline Playhead Detection:** Automatically inspects the active timeline at the playhead position, extracting trims, left offsets, and durations.
+- 📋 **Timeline Video Clip Index & Media Pool Detection:** Full dropdown selector for timeline clips or instant loading from selected Media Pool clips.
+- 🎬 **Single Clip Datamoshing:** Process individual clips across specific second ranges with all 7 engines.
+- 🆓 **Full Compatibility:** 100% functional on **DaVinci Resolve Free** and **DaVinci Resolve Studio** (Windows 64-bit).
 
 ---
 
 ## 🎛️ Modes Reference
 
-| Mode | Engine | Technical Operation |
+| Mode | Engine | Visual Behavior & Use Case |
 |:---|:---|:---|
-| 🟢 **Classic** | *Avidemux / pymosh* | Strips keyframe byte marker (`00 01 B0`) at the transition cut, forcing decoder motion interpolation onto the unrefreshed canvas. |
-| 🟣 **Bloom** | *Tomato Automosh* | Replicates delta frames with frame-length scaling, producing explosive macroblock displacement. |
-| 🔵 **Repeat** | *MPEG Packet Loop* | Duplicates consecutive P-frame packet sequences (`00 01 B6`) to create a looping motion trajectory. |
-| ⚫ **Void** | *Tomato Automosh* | Detects scene boundaries and removes reference frames to dissolve incoming video into darkness. |
+| 🟢 **Classic Motion Melt** | *Avidemux / Datamosher Pro* | **The iconic music-video datamosh.** Clip 2's movement drags and melts Clip 1's pixels at full natural speed without stuttering. Recovers sharply when the glitch ends. |
+| ⚡ **Kinetic Stutter** | *Repeat / P-Frame Multiplier* | Repeats a short burst of initial motion vectors at the cut point for an energetic pulse. Ideal for beat drops and trap/hip-hop music videos. |
+| 🌸 **Tomato Bloom** | *Tomato Automosh* | Duplicates motion vectors while suppressing intra data, causing pixels to burst outward in chromatic flares. |
+| 🌊 **Macroblock Glide** | *Pymodes / Macroblock Smear* | Continuously smears compression macroblocks along directional motion vectors for smooth, painterly streaks. |
+| 👻 **Echo Drift** | *Pymodes / Stream Echo* | Loops and drifts motion vectors across frames, producing an eerie trailing ghost effect. |
+| 📡 **Tomato Pulse** | *Tomato Automosh* | Emits periodic, rhythmic waves of digital compression artifacts across the frame. |
+| 🕳️ **Tomato Void** | *Tomato Automosh* | Pure bitstream automosh that strips keyframes by frame byte size for raw, unpredictable cut collisions. |
 
 ---
 

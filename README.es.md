@@ -61,51 +61,33 @@ flowchart LR
 
 ---
 
-## ✨ Características Principales
+## ✨ Características Principales (v2.0)
 
-- 🔀 **Transiciones Automáticas en Cortes entre 2 Clips:** Une el plano saliente y el entrante, elimina el fotograma clave exactamente en el corte y renderiza la transición fijada.
-- 📍 **Detección Inteligente por Cabezal (Playhead):** Consulta la línea de tiempo activa de DaVinci Resolve para identificar de forma instantánea los dos clips del corte en cualquier pista de vídeo.
-- 📋 **Índice Desplegable de Clips:** Menú con todos los elementos de vídeo presentes en la línea de tiempo para combinaciones personalizadas.
-- 📁 **Multi-Selección en Media Pool:** Selecciona dos clips en el Media Pool (`Ctrl + Clic`) y cárgalos con un solo botón.
-- 🎬 **Datamosh en un Solo Clip:** Aplica estelas de movimiento, dispersión de velocidad y bucles de fotogramas en rangos temporales definidos por el usuario.
-- 📥 **Reimportación Automatizada:** Importa automáticamente el archivo final MP4 al Media Pool del proyecto activo.
-- 🆓 **Compatibilidad Total:** 100% funcional tanto en **DaVinci Resolve Free** como en **Studio** (v20+ en Windows de 64 bits).
-
----
-
-## 📸 Interfaz y Flujo de Trabajo
-
-<div align="center">
-
-### 1. Acceso desde el Menú de DaVinci Resolve
-Abre la herramienta desde la barra de menú superior en **Workspace -> Scripts -> Datamosher_Pro**:
-
-<img src="docs/images/resolve_menu.png" alt="Menú Workspace de DaVinci Resolve" width="85%" />
-
----
-
-### 2. Interfaz de Configuración de la Transición
-Detecta los clips en el corte o elígelos desde el Media Pool / desplegables, ajusta duración y delta, y genera la transición:
-
-<img src="docs/images/gui_transition.png" alt="Interfaz de Datamosher Pro en DaVinci" width="85%" />
-
----
-
-### 3. Resultado de la Transición
-Una vez concluido el renderizado, el clip generado se deposita de manera automática en tu **Media Pool** activo. Contiene el glitch real de datamoshing consolidado, donde los vectores de movimiento de la nueva escena arrastran y desgarran los macrobloques de la imagen anterior congelada. ¡Solo tienes que arrastrarlo a tu línea de tiempo sobre el corte!
-
-</div>
+- 🔀 **Motor de Datamosh Alineado por GOP:** Codifica los clips saliente y entrante de manera independiente en flujos intermedios y los concatena sin pérdida. Garantiza un I-frame exacto en el corte y un keyframe de recuperación con precisión matemática al terminar la duración del glitch.
+- ⏱️ **Control Independiente de Pre-Cut y Post-Cut:** Ajusta los segundos de entrada previa y salida posterior con una barra interactiva de previsualización de la composición (`[Clip 1: Xs] ➔ ⚡ [GLITCH: Xs] ➔ [Clip 2: Xs]`).
+- ⚡ **Presets de Estilo en 1 Clic:** Configuración instantánea con *Fluid Melt*, *Kinetic Stutter*, *Vector Bloom*, *Macro Glide* y *Fast Whip*.
+- 🎯 **Colocación Automática en el Timeline:** Crea o utiliza una pista de vídeo superior (V2/V3) e inserta la transición renderizada centrada con exactitud milimétrica sobre el corte.
+- 🎛️ **7 Algoritmos de Datamosher Pro:** Gama completa de efectos de manipulación binaria con descripciones en vivo y consejos prácticos de uso dentro de la interfaz.
+- 🖼️ **Miniaturas de Fotogramas del Corte:** Extracción en segundo plano del fotograma final del Clip 1 y el inicial del Clip 2 para comprobación visual inmediata.
+- 🎵 **Fundido Cruzado de Audio (Crossfade):** Transición suave de audio opcional entre ambos clips mediante filtros de FFmpeg.
+- 📍 **Detección Inteligente por Cabezal (Playhead):** Inspecciona el corte de la línea de tiempo activa, extrayendo puntos de recorte (in/out), offsets y duraciones reales.
+- 📋 **Índice de Clips de Timeline y Detección de Media Pool:** Selector desplegable completo o carga directa desde dos clips seleccionados en el panel de medios.
+- 🎬 **Datamosh en un Solo Clip:** Aplica cualquiera de los 7 algoritmos en intervalos de tiempo concretos sobre un solo archivo de vídeo.
+- 🆓 **Compatibilidad Total:** 100% funcional tanto en **DaVinci Resolve Free** como en **Studio** (Windows de 64 bits).
 
 ---
 
 ## 🎛️ Referencia de Algoritmos
 
-| Modo | Motor | Comportamiento Técnico |
+| Modo | Motor | Comportamiento Visual y Cuándo Usarlo |
 |:---|:---|:---|
-| 🟢 **Classic** | *Avidemux / pymosh* | Elimina el marcador de fotograma clave (`00 01 B0`) en el corte, forzando al decodificador a aplicar los vectores de movimiento sobre el lienzo anterior no refrescado. |
-| 🟣 **Bloom** | *Tomato Automosh* | Duplica fotogramas delta mediante factores de escala, generando una dispersión expansiva de macrobloques. |
-| 🔵 **Repeat** | *MPEG Packet Loop* | Repite paquetes consecutivos de fotogramas P (`00 01 B6`) para generar patrones de desplazamiento continuo en bucle. |
-| ⚫ **Void** | *Tomato Automosh* | Detecta cambios de escena y elimina fotogramas de referencia para disolver el vídeo entrante en oscuridad. |
+| 🟢 **Classic Motion Melt** | *Avidemux / Datamosher Pro* | **El datamosh clásico por excelencia.** El movimiento del Clip 2 arrastra los píxeles del Clip 1 a velocidad 100% fluida y natural. Vuelve a verse nítido en cuanto concluye el glitch. Ideal con movimientos de cámara (pan/tilt) o sujetos caminando. |
+| ⚡ **Kinetic Stutter** | *Repeat / P-Frame Multiplier* | Repite una ráfaga corta de vectores de movimiento en el corte para generar un tartamudeo rítmico enérgico. Ideal para cortes al beat y música Trap/Hip-Hop. |
+| 🌸 **Tomato Bloom** | *Tomato Automosh* | Multiplica los vectores de movimiento suprimiendo datos intra, generando llamaradas y estelas cromáticas expansivas. |
+| 🌊 **Macroblock Glide** | *Pymodes / Macroblock Smear* | Estira continuamente los bloques de compresión a lo largo de las líneas de movimiento, creando estelas suaves y fluidas. |
+| 👻 **Echo Drift** | *Pymodes / Stream Echo* | Clona e interpola vectores de movimiento creando un eco espectral continuo que transfiere la inercia del plano anterior. |
+| 📡 **Tomato Pulse** | *Tomato Automosh* | Emite ondas periódicas y rítmicas de distorsión digital a intervalos regulares. |
+| 🕳️ **Tomato Void** | *Tomato Automosh* | Automosh puro de flujo binario que elimina keyframes basándose en el peso de cada fotograma para colisiones caóticas y crudas. |
 
 ---
 
